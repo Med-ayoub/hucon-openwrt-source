@@ -1,10 +1,8 @@
-# Onion Omega2 & Omega2S Firmware Build System
+# Hucon-Omega2+ Build System
 
-This buildsystem for the OpenWRT Linux distribution has been modified by Onion Corporation to build firmware for the Onion Omega2 and Omega2S family of devices.
+This buildsystem for the OpenWRT Linux distribution has been modified by Onion Corporation and Basler to specificially build the hucon-base-image with all needed packets
 
-The buildsystem can be used to create software packages and firmware images for Omega2 and Omega2S devices.
-
-![Omega2](./omega2-family.png)
+The buildsystem can be used to create software packages and firmware images for the hucon, based on the Omega2+ devices.
 
 ## Using this Build System
 
@@ -80,10 +78,10 @@ For reference, at Onion, we generally use a server (like AWS EC2) when working w
 
 There are two preferred ways to use the buildsystem:
 
-1. Using the `onion/omega2-source` Docker image **Recommended method**
+1. Using the Dockerfile **Recommended method**
 2. Running the build system on a Linux system
 
-### Option A: Using the Docker Image
+### Option A: Using the Dockerfile
 
 The Docker image takes care of all environmental configuration and is the recommended method. We recommend getting familiar with how Docker before trying this procedure.
 
@@ -92,15 +90,21 @@ The Docker image takes care of all environmental configuration and is the recomm
 Procedure:
 
 1. Install Docker on your system: https://www.docker.com/get-started
-2. Pull our Docker image by running:
+2. Download the Build System from Github:
 ```
-docker pull onion/omega2-source
+git clone https://github.com/basler/hucon-openwrt-source.git
+cd hucon-openwrt-source
+docker build -t basler/hucon-source .
 ```
-3. Once the image has been pulled to your computer, you can run your own container based on the image:
+3. Create a folder for the firmware images:
 ```
-docker run -it onion/omega2-source /bin/bash
+mkdir hucon-build-output
 ```
-4. Your container will now be up and running! You'll be using it for the rest of the steps outlined below.
+4. Once the image has been build, you can run your own container based on the image:
+```
+docker run -v hucon-build-output:/root/source/bin/targets/ramips/mt76x8/ -it basler/hucon-source  /bin/bash
+```
+5. Your container will now be up and running! You'll be using it for the rest of the steps outlined below.
 
 ### Option B: Using a Linux System
 
@@ -116,7 +120,7 @@ sudo apt-get install -y build-essential vim git wget curl subversion build-essen
 
 2. Download the Build System from Github:
 ```
-git clone https://github.com/OnionIoT/source.git
+git clone https://github.com/basler/hucon-openwrt-source.git
 cd source
 ```
 
