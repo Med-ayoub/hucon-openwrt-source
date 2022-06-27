@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     python-dev \
     python-pip \
+    python3 \
     libxml-parser-perl \
     default-jdk
 
