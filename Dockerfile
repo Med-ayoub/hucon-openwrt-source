@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     python-dev \
     python-pip \
+    python3 \
     libxml-parser-perl \
     default-jdk
 
@@ -32,4 +33,4 @@ COPY . /root/source
 WORKDIR /root/source
 
 RUN sh scripts/onion-feed-setup.sh && python scripts/onion-setup-build.py
-
+RUN make defconfig
