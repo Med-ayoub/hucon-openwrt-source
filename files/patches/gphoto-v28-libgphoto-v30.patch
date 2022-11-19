@@ -1,0 +1,527 @@
+diff --git a/libs/libgphoto2/Makefile b/libs/libgphoto2/Makefile
+index 6f3ca92..571c770 100644
+--- a/libs/libgphoto2/Makefile
++++ b/libs/libgphoto2/Makefile
+@@ -1,6 +1,6 @@
+ #
+ # Copyright (C) 2006-2012 OpenWrt.org
+-# Copyright (C) 2017      Leonardo Medici
++# Copyright (C) 2017-2019 Leonardo Medici
+ #
+ # This is free software, licensed under the GNU General Public License v2.
+ # See /LICENSE for more information.
+@@ -9,20 +9,22 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=libgphoto2
+-PKG_VERSION:=2.5.17
+-PKG_RELEASE:=1
+-PORT_VERSION:=0.12.0
+-PKG_MAINTAINER:=Leonardo Medici <leonardo_medici@me.com>
++PKG_VERSION:=2.5.30
++PKG_RELEASE:=3
++PORT_VERSION:=0.12.1
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+ PKG_SOURCE_URL:=@SF/gphoto
+-PKG_HASH:=417464f0a313fa937e8a71cdf18a371cf01e750830195cd63ae31da0d092b555
+-PKG_LICENSE:=LGPL-2.1
++PKG_HASH:=ee61a1dac6ad5cf711d114e06b90a6d431961a6e7ec59f4b757a7cd77b1c0fb4
++
++PKG_MAINTAINER:=Leonardo Medici <leonardo_medici@me.com>
++PKG_LICENSE:=LGPL-2.1-or-later
+ PKG_LICENSE_FILES:=COPYING
+ 
+ PKG_FIXUP:=autoreconf
+ PKG_LIBTOOL_PATHS:=. libgphoto2_port
+ PKG_INSTALL:=1
++PKG_BUILD_PARALLEL:=1
+ 
+ include $(INCLUDE_DIR)/package.mk
+ include $(INCLUDE_DIR)/nls.mk
+@@ -35,7 +37,7 @@ endef
+ 
+ define Package/libgphoto2
+   $(call Package/libgphoto2/Default)
+-  DEPENDS:=+libpthread +libltdl +libusb-compat +libusb-1.0 $(ICONV_DEPENDS)
++  DEPENDS:=+libpthread +libltdl +libusb-compat +libusb-1.0 $(ICONV_DEPENDS) $(INTL_DEPENDS)
+   TITLE:=The basic library of the gphoto2 program, version $(PKG_VERSION).
+   MENU:=1
+ endef
+@@ -434,7 +436,7 @@ CONFIGURE_ARGS += \
+ 	--enable-shared \
+ 	--enable-static \
+ 	--disable-rpath \
+-	--with-camlibs="all" \
++	--with-camlibs="all,outdated" \
+ 	--with-gdlib=no \
+ 	--with-libexif=no \
+ 	--with-libusb=no \
+@@ -471,22 +473,24 @@ TARGET_CFLAGS += $(FPIC)
+ define Build/InstallDev
+ 	$(INSTALL_DIR) $(1)/usr/bin
+ 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/gphoto2{,-port}-config $(1)/usr/bin/
++	$(SED) 's,^\(prefix\|exec_prefix\)=.*,\1=$(STAGING_DIR)/usr,g' $(1)/usr/bin/gphoto2{,-port}-config
+ 	$(INSTALL_DIR) $(1)/usr/include
+ 	$(CP) $(PKG_INSTALL_DIR)/usr/include/gphoto2 $(1)/usr/include/
+ 	$(INSTALL_DIR) $(1)/usr/lib
+ 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libgphoto2{,_port}.{a,so*} $(1)/usr/lib/
+ 	$(INSTALL_DIR) $(1)/usr/lib/pkgconfig
+-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/libgphoto2.pc $(1)/usr/lib/pkgconfig/
+-	$(SED) 's,-I$$$${prefix}/include/gphoto2,,g' $(1)/usr/bin/gphoto2{,-port}-config
+-	$(SED) 's,-I$$$${prefix}/include,,g' $(1)/usr/bin/gphoto2{,-port}-config
++	$(CP) $(PKG_INSTALL_DIR)/usr/lib/pkgconfig/libgphoto2{,_port}.pc $(1)/usr/lib/pkgconfig/
+ 	# remove annoying recursive symlink
+ 	rm -f $(1)/usr/include/gphoto2/gphoto2
++	$(INSTALL_DIR) $(2)/bin
++	$(LN) ../../usr/bin/gphoto2-config $(2)/bin/gphoto2-config
++	$(LN) ../../usr/bin/gphoto2-port-config $(2)/bin/gphoto2-port-config
+ endef
+ 
+ define Package/libgphoto2/install
+ 	$(INSTALL_DIR) $(1)/usr/lib
+ 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libgphoto2{,_port}.so.* $(1)/usr/lib/
+-	ln -s $(1)/usr/lib/libgphoto2_port.so.12 $(1)/usr/lib/libgphoto2_port.so.10
++	$(LN) libgphoto2_port.so.12 $(1)/usr/lib/libgphoto2_port.so.10
+ 	$(INSTALL_DIR) $(1)/usr/lib/libgphoto2
+ 	$(CP) $(PKG_INSTALL_DIR)/usr/lib/libgphoto2/print-camera-list $(1)/usr/lib/libgphoto2/print-camera-list
+ endef
+diff --git a/libs/libgphoto2/patches/001-automake-compat.patch b/libs/libgphoto2/patches/001-automake-compat.patch
+index 4614d7b..6172853 100644
+--- a/libs/libgphoto2/patches/001-automake-compat.patch
++++ b/libs/libgphoto2/patches/001-automake-compat.patch
+@@ -1,23 +1,44 @@
+-Index: libgphoto2-2.5.17/configure.ac
+-===================================================================
+---- libgphoto2-2.5.17.orig/configure.ac
+-+++ libgphoto2-2.5.17/configure.ac
+-@@ -209,7 +209,6 @@ ALL_LINGUAS="cs da de es eu fr hu it ja
+- GP_GETTEXT_HACK([${PACKAGE}-${LIBGPHOTO2_CURRENT_MIN}],[The gPhoto Team],[${MAIL_GPHOTO_TRANSLATION}])
+- AM_GNU_GETTEXT_VERSION([0.14.1])
+- AM_GNU_GETTEXT([external])
++diff --git a/configure.ac b/configure.ac
++index 6802dec..8ef0291 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -239,7 +239,6 @@ GP_VA_COPY
++ 
++ 
++ dnl check for/set up libtool and libltdl
++-LT_PREREQ([2.4.2])
++ dnl Disable building static library, as no one uses it anyway.
++ LT_INIT([
++   disable-static
++@@ -282,9 +281,7 @@ dnl ---------------------------------------------------------------------------
++ GP_GETTEXT_SETUP([GETTEXT_PACKAGE_LIBGPHOTO2],
++                  [${PACKAGE}-${LIBGPHOTO2_CURRENT_MIN}],
++                  [po])
+ -AM_PO_SUBDIRS()
++ AM_GNU_GETTEXT_VERSION([0.19.1])
++-AM_GNU_GETTEXT([external])
+  AM_ICONV()
+- GP_GETTEXT_FLAGS()
+-
+-Index: libgphoto2-2.5.17/libgphoto2_port/configure.ac
+-===================================================================
+---- libgphoto2-2.5.17.orig/libgphoto2_port/configure.ac
+-+++ libgphoto2-2.5.17/libgphoto2_port/configure.ac
+-@@ -124,7 +124,6 @@ GP_GETTEXT_HACK([${PACKAGE}-${LIBGPHOTO2
+- ALL_LINGUAS="cs da de es eu fi fr it ja nl pl pt_BR ru sk sr sv uk vi zh_CN zh_TW"
+- AM_GNU_GETTEXT_VERSION([0.14.1])
+- AM_GNU_GETTEXT([external])
++ 
++ GP_CONFIG_MSG([Use translations],
++diff --git a/libgphoto2_port/configure.ac b/libgphoto2_port/configure.ac
++index bef877b..92244c9 100644
++--- a/libgphoto2_port/configure.ac
+++++ b/libgphoto2_port/configure.ac
++@@ -79,7 +79,6 @@ AM_PROG_AR
++ 
++ 
++ dnl check for/set up libtool and libltdl
++-LT_PREREQ([2.4.2])
++ dnl Disable building static library, as no one uses it anyway.
++ LT_INIT([
++   disable-static
++@@ -122,9 +121,7 @@ dnl ---------------------------------------------------------------------------
++ GP_GETTEXT_SETUP([GETTEXT_PACKAGE_LIBGPHOTO2_PORT],
++                  [${PACKAGE}-${LIBGPHOTO2_PORT_CURRENT_MIN}],
++                  [po])
+ -AM_PO_SUBDIRS()
++ AM_GNU_GETTEXT_VERSION([0.19.1])
++-AM_GNU_GETTEXT([external])
+  AM_ICONV()
+- GP_GETTEXT_FLAGS()
++ 
++ GP_CONFIG_MSG([Use translations],
+diff --git a/libs/libgphoto2/patches/002-no-docs-examples-test-translations.patch b/libs/libgphoto2/patches/002-no-docs-examples-test-translations.patch
+index 944a4c3..aadb775 100644
+--- a/libs/libgphoto2/patches/002-no-docs-examples-test-translations.patch
++++ b/libs/libgphoto2/patches/002-no-docs-examples-test-translations.patch
+@@ -1,95 +1,119 @@
+-Index: libgphoto2-2.5.17/Makefile.am
+-===================================================================
+---- libgphoto2-2.5.17.orig/Makefile.am
+-+++ libgphoto2-2.5.17/Makefile.am
+-@@ -8,7 +8,7 @@ bin_SCRIPTS = gphoto2-config
+- EXTRA_DIST = HACKING MAINTAINERS TESTERS installcheck.mk
+-
+- # Note: @subdirs@ lists all the directories from AC_CONFIG_SUBDIRS()
+--SUBDIRS = @subdirs@ libgphoto2 camlibs tests examples po packaging doc gphoto-m4
+-+SUBDIRS = @subdirs@ libgphoto2 camlibs packaging gphoto-m4
+-
++diff --git a/Makefile.am b/Makefile.am
++index ade6dbe..aca02e6 100644
++--- a/Makefile.am
+++++ b/Makefile.am
++@@ -9,7 +9,7 @@ EXTRA_DIST = MAINTAINERS TESTERS installcheck.mk
++ EXTRA_DIST += HACKING.md SECURITY.md
++ 
++ # Note: $(subdirs) lists all the directories from AC_CONFIG_SUBDIRS()
++-SUBDIRS = $(subdirs) libgphoto2 camlibs tests examples po packaging doc
+++SUBDIRS = $(subdirs) libgphoto2 camlibs packaging
++ 
+  EXTRA_DIST    += libgphoto2.pc.in
+  pkgconfig_DATA = libgphoto2.pc
+-Index: libgphoto2-2.5.17/Makefile.in
+-===================================================================
+---- libgphoto2-2.5.17.orig/Makefile.in
+-+++ libgphoto2-2.5.17/Makefile.in
+-@@ -482,7 +482,7 @@ EXTRA_DIST = HACKING MAINTAINERS TESTERS
+- 	INSTALL README.in README README.packaging
+-
+- # Note: @subdirs@ lists all the directories from AC_CONFIG_SUBDIRS()
+--SUBDIRS = @subdirs@ libgphoto2 camlibs tests examples po packaging doc gphoto-m4
+-+SUBDIRS = @subdirs@ libgphoto2 camlibs packaging gphoto-m4
++diff --git a/Makefile.in b/Makefile.in
++index 588c9ab..78bfe67 100644
++--- a/Makefile.in
+++++ b/Makefile.in
++@@ -556,7 +556,7 @@ EXTRA_DIST = MAINTAINERS TESTERS installcheck.mk HACKING.md \
++ 	libgphoto2_port/gphoto-m4/gp-va-copy.m4
++ 
++ # Note: $(subdirs) lists all the directories from AC_CONFIG_SUBDIRS()
++-SUBDIRS = $(subdirs) libgphoto2 camlibs tests examples po packaging doc
+++SUBDIRS = $(subdirs) libgphoto2 camlibs packaging
+  pkgconfig_DATA = libgphoto2.pc
+  noinst_DATA = libgphoto2-uninstalled.pc
+- doc_DATA = AUTHORS COPYING NEWS ABOUT-NLS ChangeLog README \
+-Index: libgphoto2-2.5.17/configure.ac
+-===================================================================
+---- libgphoto2-2.5.17.orig/configure.ac
+-+++ libgphoto2-2.5.17/configure.ac
+-@@ -635,20 +635,11 @@ gphoto-m4/Makefile
+- libgphoto2/Makefile
+- libgphoto2.pc
+- libgphoto2-uninstalled.pc
+--examples/Makefile
+--tests/Makefile
+--tests/ddb/Makefile
+--tests/ddb/check-ddb.sh
+- packaging/Makefile
+- packaging/linux-hotplug/Makefile
+- packaging/generic/Makefile
+- packaging/rpm/Makefile
+- packaging/rpm/package.spec
+--po/Makefile.in
+--doc/Makefile
+--doc/Doxyfile
+--doc/Doxyfile-internals
+--doc/api/Makefile
+- ],[
+- dnl This relies on this code being called for each of the above files
+- dnl with ac_file set to the filename.
+-Index: libgphoto2-2.5.17/libgphoto2_port/Makefile.am
+-===================================================================
+---- libgphoto2-2.5.17.orig/libgphoto2_port/Makefile.am
+-+++ libgphoto2-2.5.17/libgphoto2_port/Makefile.am
+-@@ -25,7 +25,7 @@ udevscript_PROGRAMS =
+- bin_SCRIPTS = gphoto2-port-config
+-
+- # The . stands for the current dir, i.e. the iolibs to build.
+--SUBDIRS = po libgphoto2_port test . doc gphoto-m4
+-+SUBDIRS = libgphoto2_port . gphoto-m4
+-
+-
++ doc_DATA = AUTHORS COPYING NEWS ABOUT-NLS ChangeLog README.md \
++diff --git a/camlibs/Makefile.in b/camlibs/Makefile.in
++index a372aa0..82cd870 100644
++--- a/camlibs/Makefile.in
+++++ b/camlibs/Makefile.in
++@@ -1309,7 +1309,7 @@ utilsdir = @utilsdir@
++ #
++ # Building the camlibs itself is defined in the Makefile-files
++ # included below.
++-SUBDIRS = . canon/doc konica/localization
+++SUBDIRS = . konica/localization
++ 
+  ########################################################################
+-Index: libgphoto2-2.5.17/libgphoto2_port/Makefile.in
+-===================================================================
+---- libgphoto2-2.5.17.orig/libgphoto2_port/Makefile.in
+-+++ libgphoto2-2.5.17/libgphoto2_port/Makefile.in
+-@@ -574,7 +574,7 @@ EXTRA_LTLIBRARIES = disk.la ptpip.la ser
+- bin_SCRIPTS = gphoto2-port-config
+-
++ # Define the common variables added to in the included Makefile-files
++diff --git a/camlibs/canon/Makefile-files b/camlibs/canon/Makefile-files
++index fe02b85..8672eb8 100644
++--- a/camlibs/canon/Makefile-files
+++++ b/camlibs/canon/Makefile-files
++@@ -1,6 +1,5 @@
++ # -*- Makefile -*-
++ 
++-SUBDIRS += canon/doc
++ 
++ EXTRA_LTLIBRARIES += canon.la
++ 
++diff --git a/configure.ac b/configure.ac
++index 8ef0291..f4d2484 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -656,20 +656,12 @@ AC_CONFIG_FILES([
++   Makefile
++   gphoto2-config
++   camlibs/Makefile
++-  camlibs/canon/doc/Makefile
++   camlibs/konica/localization/Makefile
++   libgphoto2/Makefile
++   libgphoto2.pc
++   libgphoto2-uninstalled.pc
++-  examples/Makefile
++-  tests/Makefile
++   packaging/Makefile
++   packaging/generic/Makefile
++-  po/Makefile.in
++-  doc/Makefile
++-  doc/Doxyfile
++-  doc/Doxyfile-internals
++-  doc/api/Makefile
++ ])
++ AC_OUTPUT
++ 
++diff --git a/libgphoto2_port/Makefile.am b/libgphoto2_port/Makefile.am
++index 69720ca..1b213c2 100644
++--- a/libgphoto2_port/Makefile.am
+++++ b/libgphoto2_port/Makefile.am
++@@ -26,7 +26,7 @@ bin_SCRIPTS = gphoto2-port-config
++ 
++ # The . stands for the current dir, i.e. the iolibs to build.
++ # Make sure the iolibs are built before running tests on them.
++-SUBDIRS = po libgphoto2_port . tests doc
+++SUBDIRS = libgphoto2_port .
++ 
++ include gphoto-m4/Makefile-files
++ 
++diff --git a/libgphoto2_port/Makefile.in b/libgphoto2_port/Makefile.in
++index cc1e1a4..aea40f4 100644
++--- a/libgphoto2_port/Makefile.in
+++++ b/libgphoto2_port/Makefile.in
++@@ -617,7 +617,7 @@ bin_SCRIPTS = gphoto2-port-config
++ 
+  # The . stands for the current dir, i.e. the iolibs to build.
+--SUBDIRS = po libgphoto2_port test . doc gphoto-m4
+-+SUBDIRS = libgphoto2_port . gphoto-m4
+-
++ # Make sure the iolibs are built before running tests on them.
++-SUBDIRS = po libgphoto2_port . tests doc
+++SUBDIRS = libgphoto2_port .
++ 
+  ########################################################################
+  # All iolibs are defined as EXTRA_LTLIBRARIES. This requires that
+-Index: libgphoto2-2.5.17/libgphoto2_port/configure.ac
+-===================================================================
+---- libgphoto2-2.5.17.orig/libgphoto2_port/configure.ac
+-+++ libgphoto2-2.5.17/libgphoto2_port/configure.ac
+-@@ -512,13 +512,10 @@ AC_SUBST([AM_LDFLAGS])
++diff --git a/libgphoto2_port/configure.ac b/libgphoto2_port/configure.ac
++index 92244c9..947c9f3 100644
++--- a/libgphoto2_port/configure.ac
+++++ b/libgphoto2_port/configure.ac
++@@ -539,13 +539,10 @@ AC_SUBST([AM_LDFLAGS])
+  # ---------------------------------------------------------------------------
+  AC_CONFIG_FILES([
+- Makefile
+--po/Makefile.in
+- libgphoto2_port/Makefile
+- libgphoto2_port.pc
+- libgphoto2_port-uninstalled.pc
+- gphoto2-port-config
+--test/Makefile
+--doc/Makefile
+- gphoto-m4/Makefile
++   Makefile
++-  po/Makefile.in
++   libgphoto2_port/Makefile
++   libgphoto2_port.pc
++   libgphoto2_port-uninstalled.pc
++   gphoto2-port-config
++-  tests/Makefile
++-  doc/Makefile
+  ])
+  AC_OUTPUT
++ 
+diff --git a/multimedia/gphoto2/Makefile b/multimedia/gphoto2/Makefile
+index e0515f6..42c49a9 100644
+--- a/multimedia/gphoto2/Makefile
++++ b/multimedia/gphoto2/Makefile
+@@ -9,20 +9,23 @@
+ include $(TOPDIR)/rules.mk
+ 
+ PKG_NAME:=gphoto2
+-PKG_VERSION:=2.5.17
++PKG_VERSION:=2.5.28
+ PKG_RELEASE:=1
+-PKG_MAINTAINER:=Leonardo Medici <leonardo_medici@me.com>
+ 
+ PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+ PKG_SOURCE_URL:=@SF/gphoto
+-PKG_HASH:=aa571039240c68a053be710ca41645aed0239fa2f0b737b8ec767fef29e3544f
++PKG_HASH:=2a648dcdf12da19e208255df4ebed3e7d2a02f905be4165f2443c984cf887375
++
++PKG_MAINTAINER:=Leonardo Medici <leonardo_medici@me.com>
+ PKG_LICENSE:=GPL-2.0
+ PKG_LICENSE_FILES:=COPYING
+ 
+ PKG_FIXUP:=autoreconf
+ PKG_INSTALL:=1
++PKG_BUILD_PARALLEL:=1
+ 
+ include $(INCLUDE_DIR)/package.mk
++include $(INCLUDE_DIR)/nls.mk
+ 
+ define Package/gphoto2
+   SECTION:=multimedia
+@@ -37,17 +40,11 @@ define Package/gphoto2/description
+ endef
+ 
+ CONFIGURE_ARGS += \
+-	--without-aalib \
+-	--without-libiconv-prefix \
+-	--without-libintl-prefix \
++	--without-aalib
+ 
+ CONFIGURE_VARS += \
+-	LIBGPHOTO2_CFLAGS="$$$$CFLAGS -I$(STAGING_DIR)/usr/include/gphoto2 $$$$CPPFLAGS" \
+-	LIBGPHOTO2_LIBS="$$$$LDFLAGS -lgphoto2 -lgphoto2_port -lltdl" \
+-	LIBEXIF_CFLAGS="$$$$CFLAGS $$$$CPPFLAGS" \
+-	LIBEXIF_LIBS="$$$$LDFLAGS -lexif" \
+-	POPT_CFLAGS="$$$$CFLAGS $$$$CPPFLAGS" \
+-	POPT_LIBS="$$$$LDFLAGS -lpopt" \
++	POPT_CFLAGS="-I$(STAGING_DIR)/usr/include" \
++	POPT_LIBS="-L$(STAGING_DIR)/usr/lib -lpopt"
+ 
+ define Package/gphoto2/install
+ 	$(INSTALL_DIR) $(1)/usr/bin
+diff --git a/multimedia/gphoto2/patches/001-automake-compat.patch b/multimedia/gphoto2/patches/001-automake-compat.patch
+index 3b24ffd..8e496e4 100644
+--- a/multimedia/gphoto2/patches/001-automake-compat.patch
++++ b/multimedia/gphoto2/patches/001-automake-compat.patch
+@@ -1,18 +1,18 @@
+-Index: gphoto2-2.5.17/Makefile.am
+-===================================================================
+---- gphoto2-2.5.17.orig/Makefile.am
+-+++ gphoto2-2.5.17/Makefile.am
++diff --git a/Makefile.am b/Makefile.am
++index 3b36e00..dddd944 100644
++--- a/Makefile.am
+++++ b/Makefile.am
+ @@ -1,4 +1,4 @@
+ -SUBDIRS = gphoto-m4 contrib doc gphoto2 packaging po tests
+ +SUBDIRS = gphoto-m4 contrib doc gphoto2 packaging tests
+  
+  ACLOCAL_AMFLAGS = -I auto-m4 -I gphoto-m4
+  EXTRA_DIST = README.md
+-Index: gphoto2-2.5.17/Makefile.in
+-===================================================================
+---- gphoto2-2.5.17.orig/Makefile.in
+-+++ gphoto2-2.5.17/Makefile.in
+-@@ -389,7 +389,7 @@ target_alias = @target_alias@
++diff --git a/Makefile.in b/Makefile.in
++index 90b8b17..792b82e 100644
++--- a/Makefile.in
+++++ b/Makefile.in
++@@ -386,7 +386,7 @@ target_alias = @target_alias@
+  top_build_prefix = @top_build_prefix@
+  top_builddir = @top_builddir@
+  top_srcdir = @top_srcdir@
+@@ -21,22 +21,23 @@ Index: gphoto2-2.5.17/Makefile.in
+  ACLOCAL_AMFLAGS = -I auto-m4 -I gphoto-m4
+  EXTRA_DIST = README.md
+  all: config.h
+-Index: gphoto2-2.5.17/configure.ac
+-===================================================================
+---- gphoto2-2.5.17.orig/configure.ac
+-+++ gphoto2-2.5.17/configure.ac
+-@@ -58,10 +58,7 @@ dnl ------------------------------------
++diff --git a/configure.ac b/configure.ac
++index 3895426..059c4fe 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -46,11 +46,8 @@ dnl i18n support
++ dnl ---------------------------------------------------------------------------
+  GP_GETTEXT_HACK([],[Lutz Müller and others],[${MAIL_GPHOTO_TRANSLATION}])
+  ALL_LINGUAS="az cs da de en_GB es eu fi fr hu id is it ja nl pa pl pt_BR ro ru rw sk sr sv uk vi zh_CN zh_TW"
++-AM_PO_SUBDIRS()
+  AM_GNU_GETTEXT_VERSION([0.14.1])
+ -AM_GNU_GETTEXT([external])
+--AM_PO_SUBDIRS()
+  AM_ICONV()
+ -GP_GETTEXT_FLAGS()
+  
+  dnl We cannot use AC_DEFINE_UNQUOTED() for these definitions, as
+  dnl we require make to do insert the proper $(datadir) value
+-@@ -407,7 +404,6 @@ AC_SUBST([AM_LDFLAGS])
++@@ -396,7 +393,6 @@ AC_SUBST([AM_LDFLAGS])
+  # Create output files
+  # ---------------------------------------------------------------------------
+  AC_CONFIG_FILES([
+diff --git a/multimedia/gphoto2/patches/002-no-docs-test.patch b/multimedia/gphoto2/patches/002-no-docs-test.patch
+index df87416..7f62596 100644
+--- a/multimedia/gphoto2/patches/002-no-docs-test.patch
++++ b/multimedia/gphoto2/patches/002-no-docs-test.patch
+@@ -1,18 +1,18 @@
+-Index: gphoto2-2.5.17/Makefile.am
+-===================================================================
+---- gphoto2-2.5.17.orig/Makefile.am
+-+++ gphoto2-2.5.17/Makefile.am
++diff --git a/Makefile.am b/Makefile.am
++index dddd944..f2b3783 100644
++--- a/Makefile.am
+++++ b/Makefile.am
+ @@ -1,4 +1,4 @@
+ -SUBDIRS = gphoto-m4 contrib doc gphoto2 packaging tests
+ +SUBDIRS = gphoto-m4 contrib gphoto2 packaging
+  
+  ACLOCAL_AMFLAGS = -I auto-m4 -I gphoto-m4
+  EXTRA_DIST = README.md
+-Index: gphoto2-2.5.17/Makefile.in
+-===================================================================
+---- gphoto2-2.5.17.orig/Makefile.in
+-+++ gphoto2-2.5.17/Makefile.in
+-@@ -389,7 +389,7 @@ target_alias = @target_alias@
++diff --git a/Makefile.in b/Makefile.in
++index 792b82e..9766623 100644
++--- a/Makefile.in
+++++ b/Makefile.in
++@@ -386,7 +386,7 @@ target_alias = @target_alias@
+  top_build_prefix = @top_build_prefix@
+  top_builddir = @top_builddir@
+  top_srcdir = @top_srcdir@
+@@ -21,11 +21,11 @@ Index: gphoto2-2.5.17/Makefile.in
+  ACLOCAL_AMFLAGS = -I auto-m4 -I gphoto-m4
+  EXTRA_DIST = README.md
+  all: config.h
+-Index: gphoto2-2.5.17/configure.ac
+-===================================================================
+---- gphoto2-2.5.17.orig/configure.ac
+-+++ gphoto2-2.5.17/configure.ac
+-@@ -407,16 +407,10 @@ AC_CONFIG_FILES([
++diff --git a/configure.ac b/configure.ac
++index 059c4fe..f8a5f88 100644
++--- a/configure.ac
+++++ b/configure.ac
++@@ -396,16 +396,10 @@ AC_CONFIG_FILES([
+  Makefile
+  gphoto2/Makefile
+  gphoto-m4/Makefile
