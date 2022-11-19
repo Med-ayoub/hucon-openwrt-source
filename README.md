@@ -92,7 +92,7 @@ Procedure:
 1. Install Docker on your system: https://www.docker.com/get-started
 2. Download the Build System from Github:
 ```
-git clone https://github.com/basler/hucon-openwrt-source.git
+git clone https://github.com/Med-ayoub/hucon-openwrt-source.git
 cd hucon-openwrt-source
 docker build -t basler/hucon-source .
 ```
@@ -120,7 +120,7 @@ sudo apt-get install -y build-essential vim git wget curl subversion build-essen
 
 2. Download the Build System from Github:
 ```
-git clone https://github.com/basler/hucon-openwrt-source.git
+git clone https://github.com/Med-ayoub/hucon-openwrt-source.git
 cd source
 ```
 
